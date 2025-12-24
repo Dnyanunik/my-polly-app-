@@ -11,7 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ------------------ MIDDLEWARE ------------------
-origin: ['https://angular-polly-app.onrender.com']
+// FIXED: Updated CORS to allow your live frontend URL
+app.use(cors({ 
+  origin: ['http://localhost:4200', 'https://angular-polly-app.onrender.com'],
+  credentials: true 
+}));
+
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -52,7 +57,7 @@ app.post("/speak", async (req, res) => {
         res.send(audioBuffer);
 
     } catch (error) {
-        console.error(error);
+        console.error("Polly Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -84,7 +89,10 @@ app.post('/api/auth/register', async (req, res) => {
 
         if (error) return res.status(400).json({ error: error.message });
 
-        res.status(201).json({ message: 'User registered successfully', user: { id: data.id, name: data.name, email: data.email } });
+        res.status(201).json({ 
+            message: 'User registered successfully', 
+            user: { id: data.id, name: data.name, email: data.email } 
+        });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -96,34 +104,31 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
-            .single();
+            .maybeSingle();
 
-        if (!data) return res.status(400).json({ error: 'User not found' });
+        if (error || !data) return res.status(400).json({ error: 'User not found' });
 
         const valid = bcrypt.compareSync(password, data.password_hash);
         if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-        res.json({ message: 'Login successful', user: { id: data.id, name: data.name, email: data.email } });
+        res.json({ 
+            message: 'Login successful', 
+            user: { id: data.id, name: data.name, email: data.email } 
+        });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// ------------------ START SERVER ------------------
-app.listen(PORT, () => {
-    console.log(`✅ Server running at http://localhost:${PORT}`);
-});
-
 // Supabase Auth - CHANGE PASSWORD
 app.post('/api/auth/change-password', async (req, res) => {
     const { email, oldPassword, newPassword } = req.body;
 
-    // 1. Debugging: Check if email arrived
     if (!email) {
         return res.status(400).json({ message: "Email is missing from request" });
     }
@@ -139,16 +144,13 @@ app.post('/api/auth/change-password', async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // 2. Verify Old Password
         const isMatch = bcrypt.compareSync(oldPassword, user.password_hash);
         if (!isMatch) {
             return res.status(400).json({ message: "Current password is wrong" });
         }
 
-        // 3. Hash New Password
         const newHash = bcrypt.hashSync(newPassword, 10);
 
-        // 4. Update Database
         const { error: updateError } = await supabase
             .from('users')
             .update({ password_hash: newHash })
@@ -158,12 +160,16 @@ app.post('/api/auth/change-password', async (req, res) => {
 
         res.json({ message: "Password updated successfully!" });
 
-   // server.js
-} catch (err) {
-    console.error("CRITICAL BACKEND ERROR:", err); 
-    // Always send a JSON object so Angular doesn't get 'undefined'
-    return res.status(500).json({ 
-        message: "Database Error: " + (err.message || "Unknown server crash") 
-    });
-}
+    } catch (err) {
+        console.error("CRITICAL BACKEND ERROR:", err); 
+        return res.status(500).json({ 
+            message: "Database Error: " + (err.message || "Unknown server crash") 
+        });
+    }
+});
+
+// ------------------ START SERVER ------------------
+// MOVED TO END: It is best practice to define all routes BEFORE calling app.listen
+app.listen(PORT, () => {
+    console.log(`✅ Server running at http://localhost:${PORT}`);
 });
