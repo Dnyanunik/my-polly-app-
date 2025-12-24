@@ -4,11 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "ng": "ng",
-  "start": "node server.js",
-  "build": "ng build --configuration production",
-  "watch": "ng build --watch --configuration development",
-  "test": "ng test"
+   "start": "node server.js",
+  "build": "npx ng build --configuration production"
   },
   "keywords": [],
   "author": "",
