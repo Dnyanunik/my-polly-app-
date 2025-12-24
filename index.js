@@ -1,32 +1,25 @@
 require('dotenv').config();
-const fs = require('fs');
 const express = require('express');
 const cors = require('cors'); 
 const bodyParser = require('body-parser');
 const { PollyClient, SynthesizeSpeechCommand } = require("@aws-sdk/client-polly");
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken'); // Added for security tokens
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key_123';
 
 // ------------------ MIDDLEWARE ------------------
-// FIXED: Updated CORS to allow your live frontend URL
 app.use(cors({ 
   origin: ['http://localhost:4200', 'https://angular-polly-app.onrender.com'],
   credentials: true 
 }));
-
 app.use(express.json());
 app.use(bodyParser.json());
 
-// ------------------ SUPABASE CLIENT ------------------
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
-
-// ------------------ AWS POLLY CLIENT ------------------
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const polly = new PollyClient({
     region: process.env.AWS_REGION,
     credentials: {
@@ -40,136 +33,64 @@ const polly = new PollyClient({
 // AWS Polly TTS
 app.post("/speak", async (req, res) => {
     try {
-        const text = req.body.text || "Hello from Amazon Polly";
-        const voice = req.body.voice || "Joanna";
-
-        const params = { OutputFormat: "mp3", Text: text, VoiceId: voice };
+        const { text, voice } = req.body;
+        const params = { OutputFormat: "mp3", Text: text || "Hello", VoiceId: voice || "Joanna" };
         const command = new SynthesizeSpeechCommand(params);
         const result = await polly.send(command);
 
         const chunks = [];
-        for await (const chunk of result.AudioStream) {
-            chunks.push(chunk);
-        }
-        const audioBuffer = Buffer.concat(chunks);
-
+        for await (const chunk of result.AudioStream) { chunks.push(chunk); }
         res.setHeader("Content-Type", "audio/mpeg");
-        res.send(audioBuffer);
-
+        res.send(Buffer.concat(chunks));
     } catch (error) {
-        console.error("Polly Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Supabase Auth - REGISTER
+// REGISTER
 app.post('/api/auth/register', async (req, res) => {
     const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-        return res.status(400).json({ error: 'All fields are required' });
-    }
-
     try {
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (existingUser) return res.status(409).json({ error: 'Email already registered' });
-
         const password_hash = bcrypt.hashSync(password, 10);
-
-        const { data, error } = await supabase
-            .from('users')
-            .insert([{ name, email, password_hash }])
-            .select()
-            .single();
-
+        const { data, error } = await supabase.from('users').insert([{ name, email, password_hash }]).select().single();
         if (error) return res.status(400).json({ error: error.message });
-
-        res.status(201).json({ 
-            message: 'User registered successfully', 
-            user: { id: data.id, name: data.name, email: data.email } 
-        });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        res.status(201).json({ message: 'Registered successfully' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Supabase Auth - LOGIN
+// LOGIN (Fixed to return a Token)
 app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-
     try {
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .maybeSingle();
+        const { data: user, error } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
+        if (error || !user) return res.status(400).json({ error: 'User not found' });
 
-        if (error || !data) return res.status(400).json({ error: 'User not found' });
-
-        const valid = bcrypt.compareSync(password, data.password_hash);
+        const valid = bcrypt.compareSync(password, user.password_hash);
         if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+        // Generate the token so Angular can save it
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
 
         res.json({ 
             message: 'Login successful', 
-            user: { id: data.id, name: data.name, email: data.email } 
+            token: token, // Sent to Frontend
+            user: { id: user.id, name: user.name, email: user.email } 
         });
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Supabase Auth - CHANGE PASSWORD
+// CHANGE PASSWORD
 app.post('/api/auth/change-password', async (req, res) => {
     const { email, oldPassword, newPassword } = req.body;
-
-    if (!email) {
-        return res.status(400).json({ message: "Email is missing from request" });
-    }
-
     try {
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-        if (error || !user) {
-            return res.status(404).json({ message: "User not found" });
+        const { data: user } = await supabase.from('users').select('*').eq('email', email).single();
+        if (!user || !bcrypt.compareSync(oldPassword, user.password_hash)) {
+            return res.status(400).json({ message: "Auth failed" });
         }
-
-        const isMatch = bcrypt.compareSync(oldPassword, user.password_hash);
-        if (!isMatch) {
-            return res.status(400).json({ message: "Current password is wrong" });
-        }
-
-        const newHash = bcrypt.hashSync(newPassword, 10);
-
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({ password_hash: newHash })
-            .eq('email', email);
-
-        if (updateError) throw updateError;
-
-        res.json({ message: "Password updated successfully!" });
-
-    } catch (err) {
-        console.error("CRITICAL BACKEND ERROR:", err); 
-        return res.status(500).json({ 
-            message: "Database Error: " + (err.message || "Unknown server crash") 
-        });
-    }
+        const { error } = await supabase.from('users').update({ password_hash: bcrypt.hashSync(newPassword, 10) }).eq('email', email);
+        if (error) throw error;
+        res.json({ message: "Password updated!" });
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// ------------------ START SERVER ------------------
-// MOVED TO END: It is best practice to define all routes BEFORE calling app.listen
-app.listen(PORT, () => {
-    console.log(`✅ Server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ Server running on ${PORT}`));
