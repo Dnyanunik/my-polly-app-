@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ------------------ MIDDLEWARE ------------------
-app.use(cors({ origin: 'http://localhost:4200' }));
+origin: ['http://localhost:4200', 'https://your-angular-app.onrender.com']
 app.use(express.json());
 app.use(bodyParser.json());
 
