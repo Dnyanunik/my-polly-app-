@@ -4,13 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-   "start": "node server.js",
-  "build": "npx ng build --configuration production"
+    "start": "node index.js",
+    "build": "npx ng build --configuration production"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@angular-devkit/build-angular": "^21.0.4",
+    "@angular/cli": "^21.0.4",
+    "@angular/compiler-cli": "^21.0.6",
     "@aws-sdk/client-polly": "^3.932.0",
     "@supabase/supabase-js": "^2.89.0",
     "bcryptjs": "^3.0.3",
