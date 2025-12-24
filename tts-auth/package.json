@@ -1,0 +1,23 @@
+{
+  "name": "tts-auth",
+  "version": "1.0.0",
+  "description": "Auth server for TTS project",
+  "main": "server.js","scripts": {
+  "start": "node index.js",
+  "server": "node index.js"
+},
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
