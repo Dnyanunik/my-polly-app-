@@ -1,7 +1,6 @@
 require('dotenv').config();
 const fs = require('fs');
 const express = require('express');
-const path = require('path'); // Required for file paths
 const cors = require('cors'); 
 const bodyParser = require('body-parser');
 const { PollyClient, SynthesizeSpeechCommand } = require("@aws-sdk/client-polly");
@@ -117,19 +116,19 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ------------------ SERVE FRONTEND (ADD THIS) ------------------
 
-// 1. Define the path to your Angular build
-// Make sure 'angular-polly-app' matches your project name in angular.json
-const distPath = path.join(__dirname, 'dist/angular-polly-app/browser');
+// index.js
+const path = require('path');
 
-// 2. Serve static files (JS, CSS, Images)
+// Since everything is at the root, use this path:
+const distPath = path.join(__dirname, 'dist', 'angular-polly-app', 'browser');
+
 app.use(express.static(distPath));
 
-// 3. Handle Angular Routing (Redirect all other requests to index.html)
 app.get('*', (req, res) => {
-    // If the request is not an API call, serve the Angular index.html
-    if (!req.url.startsWith('/api') && req.url !== '/speak') {
-        res.sendFile(path.join(distPath, 'index.html'));
-    }
+  // Only serve index.html if it's not an API or Polly request
+  if (!req.url.startsWith('/api') && req.url !== '/speak') {
+    res.sendFile(path.join(distPath, 'index.html'));
+  }
 });
 
 // ------------------ START SERVER ------------------

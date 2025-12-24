@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "build": "npx ng build --configuration production"
-  },
+   
+  "start": "node index.js",
+  "build": "npx ng build --configuration production"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
