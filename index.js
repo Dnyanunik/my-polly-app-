@@ -114,23 +114,6 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// ------------------ SERVE FRONTEND (ADD THIS) ------------------
-
-// index.js
-const path = require('path');
-
-// Since everything is at the root, use this path:
-const distPath = path.join(__dirname, 'dist', 'angular-polly-app', 'browser');
-
-app.use(express.static(distPath));
-
-app.get('*', (req, res) => {
-  // Only serve index.html if it's not an API or Polly request
-  if (!req.url.startsWith('/api') && req.url !== '/speak') {
-    res.sendFile(path.join(distPath, 'index.html'));
-  }
-});
-
 // ------------------ START SERVER ------------------
 app.listen(PORT, () => {
     console.log(`✅ Server running at http://localhost:${PORT}`);

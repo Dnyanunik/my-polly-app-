@@ -6,7 +6,7 @@
   "scripts": {
    
   "start": "node index.js",
-  "build": "npx ng build --configuration production"
+  "build": "npm install"
 },
   "keywords": [],
   "author": "",
